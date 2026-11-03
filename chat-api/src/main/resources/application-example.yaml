@@ -1,0 +1,17 @@
+# Template for application.yaml.
+# Copy this file to application.yaml (which is gitignored) and fill in
+# real values, or export the environment variables referenced below.
+
+spring:
+  application:
+    name: chat-api
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/chatdb}
+
+server:
+  port: ${SERVER_PORT:8088}
+
+logging:
+  level:
+    org.springframework.data.mongodb: INFO
+    app.rashiktimalsina.chat_api: DEBUG

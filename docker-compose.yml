@@ -1,0 +1,42 @@
+# Local infrastructure for chat-application.
+#
+# Today: a local MongoDB, so you can develop without the Atlas cluster.
+#   docker compose up -d mongo
+#   then run chat-api with MONGODB_URI=mongodb://localhost:27017/chatdb
+#
+# Later: add the api (and optionally ui) services once each sub-project
+# has a Dockerfile. Sketches are left commented out below.
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: chat-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # api:
+  #   build: ./chat-api
+  #   ports:
+  #     - "8088:8088"
+  #   environment:
+  #     MONGODB_URI: mongodb://mongo:27017/chatdb
+  #   depends_on:
+  #     mongo:
+  #       condition: service_healthy
+
+  # ui:
+  #   build: ./chat-ui
+  #   ports:
+  #     - "5173:80"
+  #   depends_on:
+  #     - api
+
+volumes:
+  mongo-data:

@@ -1,36 +1,47 @@
-HELP.md
+# ============================================================
+# chat-application root .gitignore
+# Sub-projects keep their own .gitignore files as well
+# (chat-api/.gitignore, chat-ui/.gitignore). Rules here apply
+# to the whole repository.
+# ============================================================
+
+# ---------- Secrets and local configuration ----------
+# Real config holds the MongoDB Atlas URI with credentials.
+# Commit only the *-example.yaml template.
+chat-api/src/main/resources/application.yaml
+chat-api/src/main/resources/application.yml
+chat-api/src/main/resources/application-*.yaml
+chat-api/src/main/resources/application-*.yml
+chat-api/src/main/resources/application*.properties
+!chat-api/src/main/resources/application-example.yaml
+
+# Environment files (Vite reads .env, .env.local, .env.production ...)
+.env
+.env.*
+!.env.example
+*.local
+
+# ---------- Build output ----------
 target/
-.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
-
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
+dist/
+dist-ssr/
 build/
-!**/src/main/**/build/
-!**/src/test/**/build/
 
-### VS Code ###
-.vscode/
+# ---------- Dependencies ----------
+node_modules/
 
-### application yaml ###
-application.yaml
+# ---------- IDE ----------
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/*
+!.vscode/extensions.json
+
+# ---------- OS ----------
+.DS_Store
+Thumbs.db
+
+# ---------- Logs ----------
+*.log
+logs/
