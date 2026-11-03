@@ -17,9 +17,11 @@ import reactor.core.publisher.Mono;
 public class MessageService {
 
     private final MessageRepository messageRepository;
+    private final GroupBroadcastService broadcastService;
 
     public Mono<Message> sendMessage(Message message) {
-        return messageRepository.save(message);
+        return messageRepository.save(message)
+                .doOnNext(saved -> broadcastService.broadcast(saved.getGroupId(), saved));
     }
 
     public Flux<Message> getGroupMessages(String groupId) {

@@ -2,8 +2,9 @@ package app.rashiktimalsina.chat_api.handler;
 
 import app.rashiktimalsina.chat_api.document.Message;
 import app.rashiktimalsina.chat_api.repository.MessageRepository;
-import tools.jackson.core.JacksonException;        // ✅ Jackson 3.x
-import tools.jackson.databind.ObjectMapper;         // ✅ Jackson 3.x
+import app.rashiktimalsina.chat_api.service.GroupBroadcastService;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -15,7 +16,6 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
@@ -24,8 +24,7 @@ public class ChatWebSocketHandler implements WebSocketHandler {
 
     private final MessageRepository messageRepository;
     private final ObjectMapper objectMapper;
-
-    private final Map<String, Sinks.Many<Message>> groupSinks = new ConcurrentHashMap<>();
+    private final GroupBroadcastService broadcastService;
 
     @Override
     public Mono<Void> handle(WebSocketSession session) {
@@ -34,47 +33,54 @@ public class ChatWebSocketHandler implements WebSocketHandler {
 
         log.debug("WebSocket connected: sessionId={}, groupId={}", session.getId(), groupId);
 
-        Sinks.Many<Message> sink = groupSinks.computeIfAbsent(
-                groupId,
-                id -> Sinks.many().multicast().onBackpressureBuffer()
-        );
+        Sinks.Many<String> sink = broadcastService.sinkFor(groupId);
 
         Mono<Void> inbound = session.receive()
                 .map(WebSocketMessage::getPayloadAsText)
-                .flatMap(payload -> deserialize(payload, groupId))
-                .flatMap(messageRepository::save)
-                .doOnNext(saved -> {
-                    log.debug("Message saved and broadcasting: {}", saved.getId());
-                    sink.tryEmitNext(saved);
-                })
+                .flatMap(payload -> handleIncoming(payload, groupId))
                 .doOnError(err -> log.error("Inbound error: {}", err.getMessage()))
                 .then();
 
         Flux<WebSocketMessage> outbound = sink.asFlux()
-                .map(msg -> serialize(session, msg))
+                .map(session::textMessage)
                 .doOnError(err -> log.error("Outbound error: {}", err.getMessage()));
 
         return session.send(outbound).mergeWith(inbound).then()
                 .doFinally(signal -> log.debug("WebSocket disconnected: sessionId={}", session.getId()));
     }
 
-    private Mono<Message> deserialize(String payload, String groupId) {
+    // Typing pings carry no message content and must never be persisted or
+    // treated as a Message; only real chat frames go to Mongo.
+    private Mono<Void> handleIncoming(String payload, String groupId) {
+        Map<?, ?> raw;
         try {
-            Message message = objectMapper.readValue(payload, Message.class);
-            message.setGroupId(groupId);
-            return Mono.just(message);
+            raw = objectMapper.readValue(payload, Map.class);
+        } catch (JacksonException e) {
+            log.error("Failed to parse payload: {}", e.getMessage());
+            return Mono.empty();
+        }
+
+        if ("typing".equals(raw.get("type"))) {
+            broadcastService.broadcast(groupId, new TypingEvent("typing", String.valueOf(raw.get("sender")), groupId));
+            return Mono.empty();
+        }
+
+        Message message;
+        try {
+            message = objectMapper.readValue(payload, Message.class);
         } catch (JacksonException e) {
             log.error("Failed to deserialize message payload: {}", e.getMessage());
             return Mono.empty();
         }
+        message.setGroupId(groupId);
+
+        return messageRepository.save(message)
+                .doOnNext(saved -> {
+                    log.debug("Message saved and broadcasting: {}", saved.getId());
+                    broadcastService.broadcast(groupId, saved);
+                })
+                .then();
     }
 
-    private WebSocketMessage serialize(WebSocketSession session, Message message) {
-        try {
-            return session.textMessage(objectMapper.writeValueAsString(message));
-        } catch (JacksonException e) {
-            log.error("Failed to serialize message: {}", e.getMessage());
-            return session.textMessage("{}");
-        }
-    }
+    private record TypingEvent(String type, String sender, String groupId) {}
 }

@@ -1,6 +1,7 @@
 package app.rashiktimalsina.chat_api.config;
 
 import app.rashiktimalsina.chat_api.handler.ChatWebSocketHandler;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -10,6 +11,7 @@ import org.springframework.web.reactive.HandlerMapping;
 import org.springframework.web.reactive.handler.SimpleUrlHandlerMapping;
 import org.springframework.web.reactive.socket.server.support.WebSocketHandlerAdapter;
 
+import java.util.Arrays;
 import java.util.Map;
 
 /**
@@ -20,10 +22,13 @@ import java.util.Map;
 @Configuration
 public class WebSocketConfig {
 
+    @Value("${app.cors.allowed-origins:http://localhost:5173}")
+    private String allowedOrigins;
+
     @Bean
     public CorsWebFilter corsFilter() {
         CorsConfiguration corsConfiguration = new CorsConfiguration();
-        corsConfiguration.addAllowedOriginPattern("*");
+        corsConfiguration.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
         corsConfiguration.addAllowedMethod("*");
         corsConfiguration.addAllowedHeader("*");
         corsConfiguration.setAllowCredentials(true);
